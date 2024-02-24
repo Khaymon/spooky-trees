@@ -1,2 +1,2 @@
-# trees-and-ensembles
+# Trees and ensembles
 Trees and ensembles implementation
