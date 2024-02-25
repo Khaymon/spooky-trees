@@ -4,14 +4,13 @@ import typing as T
 import numpy as np
 import pandas as pd
 
-from trees_and_ensembles.criterions import SpookyCriterion, SpookyEntropy
-from trees_and_ensembles.predicates import (
+from spooky_trees.criterions import SpookyCriterion, SpookyEntropy
+from spooky_trees.predicates import (
     SpookyCategorialPredicate,
     SpookyCompareOperation,
     SpookyNumericalPredicate,
     SpookyPredicate,
 )
-
 
 
 @dataclass
@@ -21,17 +20,27 @@ class SpookyNode:
     def __init__(self, y: pd.Series):
         assert len(y) >= 1, "Targets length should be greater or equal to 1"
 
-        y_counts = y.value_counts()
-        self.prediction = y_counts.index[y_counts.argmax()]
+        self.proba_estimation = y.value_counts() / len(y)
 
     def predict(self) -> T.Any:
-        return self.prediction
+        return self.proba_estimation.index[self.proba_estimation.argmax()]
+    
+    def predict_proba(self) -> pd.Series:
+        return self.proba_estimation
 
 
 class SpookyTree:
-    def __init__(self, criterion: SpookyCriterion = SpookyEntropy(), max_depth: int = -1):
-        self.max_depth = max_depth
+    def __init__(
+        self,
+        criterion: SpookyCriterion = SpookyEntropy(),
+        max_depth: int = -1,
+        min_samples_split: int = 2,
+        min_information_gain: float = 0.0,
+    ):
         self.criterion = criterion
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.min_information_gain = min_information_gain
 
         self._root = None
     
@@ -66,20 +75,24 @@ class SpookyTree:
             idx += 1
 
         return best_threshold, best_criterion
+    
+    def _get_best_categorial_threshold(self, X: pd.DataFrame, y: pd.Series, feature: str) -> T.Tuple[None, float]:
+        current_criterion = 0
+        for feature_value in X[feature].unique():
+            feature_value_mask = X[feature] == feature_value
+            y_feature_value = y[feature_value_mask]
+
+            current_criterion += self.criterion(y_feature_value) * len(y_feature_value)
+
+        return None, current_criterion
 
     def _get_best_feature(self, X: pd.DataFrame, y: pd.Series) -> T.Tuple[str, float | None]:
         best_feature = None
         best_threshold = None
         best_criterion = None
         for feature in X:
-            current_criterion = 0
             if X[feature].dtype == object:
-                for feature_value in X[feature].unique():
-                    feature_value_mask = X[feature] == feature_value
-                    y_feature_value = y[feature_value_mask]
-
-                    current_criterion += self.criterion(y_feature_value) * len(y_feature_value)
-                threshold = None  # None for categorial features
+                threshold, current_criterion = self._get_best_categorial_threshold(X, y, feature)
             elif X[feature].dtype in (int, float):
                 threshold, current_criterion = self._get_best_numerical_threshold(X, y, feature)
             else:
@@ -90,7 +103,7 @@ class SpookyTree:
                 best_threshold = threshold
                 best_criterion = current_criterion
         
-        return best_feature, best_threshold
+        return best_feature, best_threshold, best_criterion
 
     def _spooky_branch(
         self,
@@ -105,8 +118,13 @@ class SpookyTree:
             return
         if len(y.unique()) == 1:
             return
+        if len(X) < self.min_samples_split:
+            return
 
-        feature, threshold = self._get_best_feature(X, y)
+        feature, threshold, criterion = self._get_best_feature(X, y)
+
+        if len(y) * self.criterion(y) - criterion < self.min_information_gain:
+            return
 
         children = []
         if X[feature].dtype == object:
