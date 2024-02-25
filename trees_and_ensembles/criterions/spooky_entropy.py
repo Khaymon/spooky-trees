@@ -5,7 +5,7 @@ from .spooky_criterion import SpookyCriterion
 
 
 class SpookyEntropy(SpookyCriterion):
-    def __call__(self, y: pd.Series, prediction) -> float:
+    def __call__(self, y: pd.Series) -> float:
         if len(y) == 0:
             return 0
 

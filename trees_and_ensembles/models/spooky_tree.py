@@ -5,7 +5,13 @@ import numpy as np
 import pandas as pd
 
 from trees_and_ensembles.criterions import SpookyCriterion, SpookyEntropy
-from trees_and_ensembles.predicates import SpookyCategorialPredicate, SpookyPredicate
+from trees_and_ensembles.predicates import (
+    SpookyCategorialPredicate,
+    SpookyCompareOperation,
+    SpookyNumericalPredicate,
+    SpookyPredicate,
+)
+
 
 
 @dataclass
@@ -13,8 +19,9 @@ class SpookyNode:
     children: T.Tuple[T.Tuple[SpookyPredicate, "SpookyNode"]] = ()
 
     def __init__(self, y: pd.Series):
-        y_counts = y.value_counts()
+        assert len(y) >= 1, "Targets length should be greater or equal to 1"
 
+        y_counts = y.value_counts()
         self.prediction = y_counts.index[y_counts.argmax()]
 
     def predict(self) -> T.Any:
@@ -29,6 +36,8 @@ class SpookyTree:
         self._root = None
     
     def _get_best_numerical_threshold(self, X: pd.DataFrame, y: pd.Series, feature: str) -> T.Tuple[int | float, float]:
+        assert len(y) > 1, "Number of samples must be greater than 1"
+
         argsorted_feature_values = X[feature].to_numpy().argsort()
 
         sorted_feature_values = X[feature].iloc[argsorted_feature_values]
@@ -42,19 +51,12 @@ class SpookyTree:
             left_y = y_sorted[:idx]
             right_y = y_sorted[idx:]
 
-            left_criterion = self.criterion(left_y)
-            right_criterion = self.criterion(right_y)
-            if len(left_y) == 0:
-                current_criterion = right_criterion
-            elif len(right_criterion) == 0:
-                current_criterion = left_criterion
-            else:
-                current_criterion = left_criterion * len(left_y) + right_criterion * len(right_y)
+            current_criterion = self.criterion(left_y) * len(left_y) + self.criterion(right_y) * len(right_y)
             
             if best_criterion is None or current_criterion < best_criterion:
-                best_threshold = sorted_feature_values[idx]
+                best_threshold = sorted_feature_values.iloc[idx]
                 best_criterion = current_criterion
-        
+
         return best_threshold, best_criterion
 
     def _get_best_feature(self, X: pd.DataFrame, y: pd.Series) -> T.Tuple[str, float | None]:
@@ -114,17 +116,24 @@ class SpookyTree:
                     depth=depth + 1,
                 )
         elif X[feature].dtype in (float, int):
-            left_predicate = SpookyCategorialPredicate(feature, threshold)
-            right_predicate = SpookyCategorialPredicate(feature, threshold)
-
-            left_node = SpookyNode(y[left_elements_mask])
-            right_node = SpookyNode(y[right_elements_mask])
-
-            children.append((left_predicate, left_node))
-            children.append((right_predicate, right_node))
+            left_predicate = SpookyNumericalPredicate(feature, threshold, SpookyCompareOperation.LESS)
+            right_predicate = SpookyNumericalPredicate(feature, threshold, SpookyCompareOperation.GREATER_OR_EQUAL)
 
             left_elements_mask = left_predicate(X)
             right_elements_mask = right_predicate(X)
+
+            try:
+                left_node = SpookyNode(y[left_elements_mask])
+                right_node = SpookyNode(y[right_elements_mask])
+            except:
+                print(y)
+                print(y[left_elements_mask])
+                print(y[right_elements_mask])
+
+                assert False
+
+            children.append((left_predicate, left_node))
+            children.append((right_predicate, right_node))
 
             self._spooky_branch(
                 X=X[left_elements_mask],
