@@ -1,0 +1,2 @@
+from .spooky_categorial_predicate import SpookyCategorialPredicate
+from .spooky_predicate import SpookyPredicate
