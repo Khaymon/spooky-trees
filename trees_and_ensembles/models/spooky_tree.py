@@ -175,6 +175,8 @@ class SpookyTree:
 
                         break
                 if not node_changed:
+                    print(X.iloc[idx])
+                    print(current_node.children)
                     raise RuntimeError("Node is not changed during traversal")
             predictions[idx] = current_node.predict()
         
