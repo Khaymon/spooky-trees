@@ -17,16 +17,20 @@ from spooky_trees.predicates import (
 class SpookyNode:
     children: T.Tuple[T.Tuple[SpookyPredicate, "SpookyNode"]] = ()
 
-    def __init__(self, y: pd.Series):
+    def __init__(self, n_classes: int, y: pd.Series):
         assert len(y) >= 1, "Targets length should be greater or equal to 1"
 
-        self.proba_estimation = y.value_counts() / len(y)
-
-    def predict(self) -> T.Any:
-        return self.proba_estimation.index[self.proba_estimation.argmax()]
+        self.n_classes = n_classes
+        self._proba_estimation = y.value_counts() / len(y)
     
-    def predict_proba(self) -> pd.Series:
-        return self.proba_estimation
+    def predict_proba(self) -> np.ndarray:
+        probas = np.zeros(self.n_classes, dtype=float)
+        probas[self._proba_estimation.index] = self._proba_estimation.to_numpy()
+
+        return probas
+    
+    def predict(self) -> int:
+        return self.predict_proba().argmax()
 
 
 class SpookyTree:
@@ -131,7 +135,7 @@ class SpookyTree:
             for feature_value in X[feature].unique():
                 feature_value_predicate = SpookyCategorialPredicate(feature, feature_value)
                 feature_value_mask = feature_value_predicate(X)
-                feature_value_node = SpookyNode(y[feature_value_mask])
+                feature_value_node = SpookyNode(n_classes=self.n_classes, y=y[feature_value_mask])
 
                 children.append((feature_value_predicate, feature_value_node))
 
@@ -148,8 +152,8 @@ class SpookyTree:
             left_elements_mask = left_predicate(X)
             right_elements_mask = right_predicate(X)
 
-            left_node = SpookyNode(y[left_elements_mask])
-            right_node = SpookyNode(y[right_elements_mask])
+            left_node = SpookyNode(n_classes=self.n_classes, y=y[left_elements_mask])
+            right_node = SpookyNode(n_classes=self.n_classes, y=y[right_elements_mask])
 
             children.append((left_predicate, left_node))
             children.append((right_predicate, right_node))
@@ -174,25 +178,34 @@ class SpookyTree:
     def fit(self, X: pd.DataFrame, y: pd.Series) -> "SpookyTree":
         assert len(X) == len(y), "Number of objects and targets should be equal"
 
-        self._root = SpookyNode(y)
+        self.n_classes = len(y.value_counts())
+
+        self._root = SpookyNode(n_classes=self.n_classes, y=y)
         self._spooky_branch(X=X, y=y, node=self._root, depth=1)
 
         return self
-
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
-        predictions = [None] * len(X)
-
-        for idx in range(len(X)):
-            current_node = self._root
-            while len(current_node.children) > 0:
-                node_changed = False
-                for predicate, child in current_node.children:
-                    if predicate(X.iloc[idx]):
-                        current_node = child
-                        node_changed = True
-                        break
-                if not node_changed:
+    
+    def _find_node(self, x: pd.Series) -> SpookyNode:
+        current_node = self._root
+        while len(current_node.children) > 0:
+            node_changed = False
+            for predicate, child in current_node.children:
+                if predicate(x):
+                    current_node = child
+                    node_changed = True
                     break
-            predictions[idx] = current_node.predict()
+            if not node_changed:
+                break
 
-        return predictions
+        return current_node
+
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        probas = []
+        for idx in range(len(X)):
+            node = self._find_node(X.iloc[idx])
+            probas.append(node.predict_proba())
+
+        return np.vstack(probas)
+    
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        return self.predict_proba(X).argmax(axis=-1)
