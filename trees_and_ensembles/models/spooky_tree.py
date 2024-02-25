@@ -46,10 +46,12 @@ class SpookyTree:
         y_sorted = y.iloc[argsorted_feature_values]
 
         best_threshold = None
-        best_criterion = None
+        best_criterion = 1e9
 
         # Naiive implementation with O(n^2) complexity
         idx = 1
+        while idx < len(X_feature_np_sorted) and X_feature_np_sorted[idx - 1] == X_feature_np_sorted[idx]:
+            idx += 1
         while idx < len(X_feature_np_sorted):
             while idx < len(X_feature_np_sorted) - 1 and X_feature_np_sorted[idx] == X_feature_np_sorted[idx + 1]:
                 idx += 1
@@ -128,16 +130,8 @@ class SpookyTree:
             left_elements_mask = left_predicate(X)
             right_elements_mask = right_predicate(X)
 
-            try:
-                left_node = SpookyNode(y[left_elements_mask])
-                right_node = SpookyNode(y[right_elements_mask])
-            except:
-                print(max(X[feature]), min(X[feature]), threshold)
-                print(y)
-                print(y[left_elements_mask])
-                print(y[right_elements_mask])
-
-                assert False
+            left_node = SpookyNode(y[left_elements_mask])
+            right_node = SpookyNode(y[right_elements_mask])
 
             children.append((left_predicate, left_node))
             children.append((right_predicate, right_node))
