@@ -172,12 +172,9 @@ class SpookyTree:
                     if predicate(X.iloc[idx]):
                         current_node = child
                         node_changed = True
-
                         break
                 if not node_changed:
-                    print(X.iloc[idx])
-                    print([child[0] for child in current_node.children])
-                    raise RuntimeError("Node is not changed during traversal")
+                    break
             predictions[idx] = current_node.predict()
-        
+
         return predictions
