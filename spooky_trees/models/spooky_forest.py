@@ -1,3 +1,5 @@
+from functools import partial
+from multiprocessing import Pool
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -11,22 +13,29 @@ class SpookyForest:
         self,
         n_estimators: int = 100,
         max_samples: int | None = None,
+        n_workers: int | None = None,
         **kwargs
     ):
         self.n_estimators = n_estimators
         self.max_samples = max_samples
+        self.n_workers = n_workers
 
         self.spooky_tree_params = kwargs
 
         self._spooky_trees: T.List[SpookyTree] = []
 
+    @staticmethod
+    def _train_spooky_tree(ids: T.Sequence[int], X: pd.DataFrame, y: pd.Series, tree_params: T.Dict) -> SpookyTree:
+        return SpookyTree(**tree_params).fit(X.iloc[ids], y.iloc[ids])
+
     def fit(self, X: pd.DataFrame, y: pd.Series) -> "SpookyForest":
         self.max_samples = self.max_samples or len(X)
-        self._spooky_trees = []
-        for _ in tqdm(range(self.n_estimators)):
-            spooky_tree = SpookyTree(**self.spooky_tree_params)
-            current_ids = np.random.choice(np.arange(len(X)), size=self.max_samples)
-            self._spooky_trees.append(spooky_tree.fit(X.iloc[current_ids], y.iloc[current_ids]))
+        
+        with Pool(self.n_workers) as pool:
+            ids = [np.random.choice(np.arange(len(X)), size=self.max_samples) for _ in range(self.n_estimators)]
+            self._spooky_trees = list(tqdm(pool.imap_unordered(
+                partial(self._train_spooky_tree, X=X, y=y, tree_params=self.spooky_tree_params), ids
+            ), total=len(ids)))
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         probas = []
