@@ -1,2 +1,2 @@
 # Spooky Trees
-Spooky trees for spooky overfitting are here!
+Spooky trees for spooky overfitting!
