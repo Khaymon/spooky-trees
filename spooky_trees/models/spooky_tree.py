@@ -61,16 +61,22 @@ class SpookyTree:
         best_threshold = None
         best_criterion = 1e9
 
-        criterions = self.criterion.rolling(y_sorted)
-        best_threshold = np.argmax(criterions[1:])
-
         idx = 1
         while idx < len(X_feature_np_sorted) and X_feature_np_sorted[idx - 1] == X_feature_np_sorted[idx]:
             idx += 1
 
-        best_idx = np.argmin(criterions[idx:])
-        best_threshold = X_feature_np_sorted[idx + best_idx]
-        best_criterion = criterions[best_idx]
+        while idx < len(X_feature_np_sorted):
+            while idx < len(X_feature_np_sorted) and X_feature_np_sorted[idx] == X_feature_np_sorted[idx - 1]:
+                idx += 1
+
+            left_criterion = self.criterion(y_sorted.iloc[:idx])
+            right_criterion = self.criterion(y_sorted.iloc[idx:])
+
+            criterion = left_criterion * idx + right_criterion * (len(X_feature_np_sorted) - idx)
+            if criterion < best_criterion:
+                best_criterion = criterion
+                best_threshold = X_feature_np_sorted[idx]
+            idx += 1
 
         return best_threshold, best_criterion
     
