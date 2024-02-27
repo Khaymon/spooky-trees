@@ -25,8 +25,8 @@ class SpookyForest:
         self._spooky_trees: T.List[SpookyTree] = []
 
     @staticmethod
-    def _train_spooky_tree(ids: T.Sequence[int], X: pd.DataFrame, y: pd.Series, tree_params: T.Dict) -> SpookyTree:
-        return SpookyTree(**tree_params).fit(X.iloc[ids], y.iloc[ids])
+    def _train_spooky_tree(ids: T.Sequence[int], X: np.ndarray, y: np.ndarray, tree_params: T.Dict) -> SpookyTree:
+        return SpookyTree(**tree_params).fit(X[ids], y[ids])
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> "SpookyForest":
         self.max_samples = self.max_samples or len(X)
@@ -37,12 +37,12 @@ class SpookyForest:
                 partial(self._train_spooky_tree, X=X, y=y, tree_params=self.spooky_tree_params), ids
             ), total=len(ids)))
 
-    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
         probas = []
         for spooky_tree in tqdm(self._spooky_trees):
             probas.append(spooky_tree.predict_proba(X))
         
         return np.mean(np.stack(probas), axis=0)
 
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
+    def predict(self, X: np.ndarray) -> np.ndarray:
         return self.predict_proba(X).argmax(axis=-1)
