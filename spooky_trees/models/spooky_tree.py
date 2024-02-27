@@ -86,15 +86,31 @@ class SpookyTree:
 
         return best_threshold, best_criterion
     
-    def _get_best_categorial_threshold(self, X: np.ndarray, y: np.ndarray, feature_idx: int) -> T.Tuple[None, float]:
-        current_criterion = 0
-        for feature_value in np.unique(X[:, feature_idx]):
+    def _get_best_categorial_threshold(self, X: np.ndarray, y: np.ndarray, feature_idx: int) -> T.Tuple[T.List[T.Set[float]], float]:
+        unique_values = set(np.unique(X[:, feature_idx]))
+
+        best_criterion = 0
+        threshold = [{value} for value in unique_values]
+        for feature_value in unique_values:
             feature_value_mask = X[:, feature_idx] == feature_value
             y_feature_value = y[feature_value_mask]
 
-            current_criterion += self.criterion(y_feature_value) * len(y_feature_value)
+            best_criterion += self.criterion(y_feature_value) * len(y_feature_value)
 
-        return None, current_criterion
+        for feature_value in unique_values:
+            feature_value_mask = X[:, feature_idx] == feature_value
+
+            y_feature_value = y[feature_value_mask]
+            y_not_feature_value = y[~feature_value_mask]
+
+            current_criterion = self.criterion(y_feature_value) * feature_value_mask.sum()
+            current_criterion += self.criterion(y_not_feature_value) * (len(y) - feature_value_mask.sum())
+
+            if current_criterion < best_criterion:
+                best_criterion = current_criterion
+                threshold = [{feature_value}, unique_values.difference(set(feature_value))]
+
+        return threshold, best_criterion
 
     def _get_best_feature(self, X: np.ndarray, y: np.ndarray) -> T.Tuple[str, float | None]:
         best_feature = None
@@ -136,8 +152,8 @@ class SpookyTree:
 
         children = []
         if feature_idx in self.cat_features:
-            for feature_value in np.unique(X[:, feature_idx]):
-                feature_value_predicate = SpookyCategorialPredicate(feature_idx, feature_value)
+            for features_set in threshold:
+                feature_value_predicate = SpookyCategorialPredicate(feature_idx, features_set)
                 feature_value_mask = feature_value_predicate(X)
                 feature_value_node = SpookyNode(n_classes=self.n_classes, y=y[feature_value_mask])
 
