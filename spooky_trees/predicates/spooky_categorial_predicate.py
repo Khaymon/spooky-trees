@@ -15,8 +15,8 @@ class SpookyCategorialPredicate(SpookyPredicate):
     def __call__(self, X: np.ndarray) -> np.ndarray | bool:
 
         if X.ndim == 2:
-            return self.predicate_func(X[:, self.feature_idx])
+            return self.predicate_func(X[:, self.feature_idx].astype(int))
         elif X.ndim == 1:
-            return self.predicate_func(X[self.feature_idx])
+            return self.predicate_func(int(X[self.feature_idx]))
         else:
             raise NotImplementedError()
