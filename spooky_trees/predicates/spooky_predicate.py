@@ -1,6 +1,6 @@
-import pandas as pd
+import numpy as np
 
 
 class SpookyPredicate:
-    def __call__(self, X: pd.DataFrame | pd.Series) -> bool:
+    def __call__(self, X: np.ndarray) -> np.ndarray | bool:
         raise NotImplementedError()

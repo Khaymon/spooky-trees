@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-import pandas as pd
+import numpy as np
 
 from .spooky_predicate import SpookyPredicate
 
@@ -12,17 +12,27 @@ class SpookyCompareOperation:
 
 
 class SpookyNumericalPredicate(SpookyPredicate):
-    def __init__(self, feature: str, value: float | int, operation: str):
+    def __init__(self, feature_idx: str, value: float | int, operation: str):
         assert operation in (SpookyCompareOperation.LESS, SpookyCompareOperation.GREATER_OR_EQUAL)
         
-        self._feature = feature
+        self._feature_idx = feature_idx
         self._value = value
         self._operation = operation
 
-    def __call__(self, X: pd.DataFrame | pd.Series) -> bool:
+    def __call__(self, X: np.ndarray) -> np.ndarray | bool:
         if self._operation == SpookyCompareOperation.LESS:
-            return X[self._feature] < self._value
+            if X.ndim == 2:
+                return X[:, self._feature_idx] < self._value
+            elif X.ndim == 1:
+                return X[self._feature_idx] < self._value
+            else:
+                raise RuntimeError()
         elif self._operation == SpookyCompareOperation.GREATER_OR_EQUAL:
-            return X[self._feature] >= self._value
+            if X.ndim == 2:
+                return X[:, self._feature_idx] >= self._value
+            elif X.ndim == 1:
+                return X[self._feature_idx] >= self._value
+            else:
+                raise RuntimeError()
         else:
             raise NotImplementedError(f"Operation {self._operation} is not implemented")

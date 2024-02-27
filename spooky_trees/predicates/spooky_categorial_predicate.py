@@ -1,14 +1,19 @@
 from dataclasses import dataclass
 
-import pandas as pd
+import numpy as np
 
 from .spooky_predicate import SpookyPredicate
 
 
 @dataclass
 class SpookyCategorialPredicate(SpookyPredicate):
-    feature_name: str
-    feature_value: str
+    feature_idx: int
+    feature_value: float
 
-    def __call__(self, X: pd.DataFrame | pd.Series) -> bool | pd.Series:
-        return X[self.feature_name] == self.feature_value
+    def __call__(self, X: np.ndarray) -> np.ndarray | bool:
+        if X.ndim == 2:
+            return X[:, self.feature_idx] == self.feature_value
+        elif X.ndim == 1:
+            return X[self.feature_idx] == self.feature_value
+        else:
+            raise NotImplementedError()
