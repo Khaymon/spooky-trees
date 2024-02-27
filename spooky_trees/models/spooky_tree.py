@@ -72,6 +72,8 @@ class SpookyTree:
         while idx < len(X_feature_sorted):
             while idx < len(X_feature_sorted) and X_feature_sorted[idx] == X_feature_sorted[idx - 1]:
                 idx += 1
+            if idx >= len(X_feature_sorted):
+                break
 
             left_criterion = self.criterion(y_sorted[:idx])
             right_criterion = self.criterion(y_sorted[idx:])
