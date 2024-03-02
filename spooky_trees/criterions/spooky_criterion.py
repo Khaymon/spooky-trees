@@ -1,11 +1,15 @@
-import typing as T
-
 import numpy as np
 
 
 class SpookyCriterion:
-    def __call__(self, y: np.ndarray) -> float:
+    def __init__(self, **kwargs):
+        ...
+
+    def __call__(self, y: np.ndarray, predictions: np.ndarray) -> float:
         raise NotImplementedError()
     
-    def rolling(self, y: np.ndarray) -> T.List[T.Tuple[float, float]]:
+    def predict(self, y: np.ndarray) -> float:
+        raise NotImplementedError()
+    
+    def grad_output(self, y: np.ndarray, predictions: np.ndarray) -> np.ndarray:
         raise NotImplementedError()

@@ -6,14 +6,35 @@ from .spooky_criterion import SpookyCriterion
 
 
 class SpookyEntropy(SpookyCriterion):
-    def __call__(self, y: np.ndarray) -> float:
+    def __init__(self, n_classes: int, **kwargs):
+        super().__init__(**kwargs)
+
+        self._n_classes = n_classes
+
+    def probas(self, classes: np.ndarray) -> np.ndarray:
+        if len(classes) == 0:
+            return np.zeros(self._n_classes, dtype=np.float32)
+
+        if classes.ndim == 2:
+            counts = classes.sum(axis=0)
+            assert len(counts) == self._n_classes
+            probas = counts / counts.sum()
+        else:
+            classes, counts = np.unique(classes, return_counts=True)
+            probas = np.zeros(self._n_classes, dtype=np.float32)
+            probas[classes] = counts / counts.sum()
+
+        return probas
+
+    def __call__(self, y: np.ndarray, predictions: np.ndarray) -> float:
         if len(y) == 0:
-            return 0
+            return 0.0
 
-        _, counts = np.unique(y, return_counts=True)
+        non_zero_mask = predictions != 0
+        return np.mean(-self.probas(y)[non_zero_mask] * np.log(predictions[non_zero_mask]))
 
-        if counts.sum() == 0:
-            return 0
-        target_probas = counts / counts.sum()
+    def predict(self, y: np.ndarray) -> float:
+        return self.probas(y)
 
-        return np.sum(-target_probas * np.log(target_probas))
+    def grad_output(self, y: np.ndarray, predictions: np.ndarray) -> np.ndarray:
+        return -y / (predictions + 1e-5)
