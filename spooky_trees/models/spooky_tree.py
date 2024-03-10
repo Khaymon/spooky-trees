@@ -259,7 +259,7 @@ class SpookyTree:
 
         self.n_classes = len(np.unique(y))
 
-        prediction = self.criterion.predict(y, weights)
+        prediction = self.criterion.predict(y, weights=weights)
         self._root = SpookyNode(prediction=prediction)
         self._spooky_branch(X=X, y=y, weights=weights, node=self._root, depth=1)
 
