@@ -12,8 +12,8 @@ class SpookyForest:
     def __init__(
         self,
         n_estimators: int = 100,
-        max_samples: int | None = None,
-        n_workers: int | None = None,
+        max_samples: T.Optional[int] = None,
+        n_workers: T.Optional[int] = None,
         **kwargs
     ):
         self.n_estimators = n_estimators

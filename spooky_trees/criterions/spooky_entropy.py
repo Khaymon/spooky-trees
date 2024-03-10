@@ -11,7 +11,7 @@ class SpookyEntropy(SpookyCriterion):
 
         self._n_classes = n_classes
 
-    def probas(self, classes: np.ndarray) -> np.ndarray:
+    def probas(self, classes: np.ndarray, **kwargs) -> np.ndarray:
         if len(classes) == 0:
             return np.zeros(self._n_classes, dtype=np.float32)
 
@@ -26,15 +26,15 @@ class SpookyEntropy(SpookyCriterion):
 
         return probas
 
-    def __call__(self, y: np.ndarray, predictions: np.ndarray) -> float:
+    def __call__(self, y: np.ndarray, predictions: np.ndarray, **kwargs) -> float:
         if len(y) == 0:
             return 0.0
 
         non_zero_mask = predictions != 0
         return np.mean(-self.probas(y)[non_zero_mask] * np.log(predictions[non_zero_mask]))
 
-    def predict(self, y: np.ndarray) -> float:
+    def predict(self, y: np.ndarray, **kwargs) -> float:
         return self.probas(y)
 
-    def grad_output(self, y: np.ndarray, predictions: np.ndarray) -> np.ndarray:
+    def grad_output(self, y: np.ndarray, predictions: np.ndarray, **kwargs) -> np.ndarray:
         return -y / (predictions + 1e-5)

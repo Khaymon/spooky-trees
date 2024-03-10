@@ -10,17 +10,17 @@ class SpookyMSE(SpookyCriterion):
         self._l2_leaf_reg = l2_leaf_reg
         self._l1_leaf_reg = l1_leaf_reg
 
-    def __call__(self, y: np.ndarray, predictions: np.ndarray) -> float:
+    def __call__(self, y: np.ndarray, predictions: np.ndarray, **kwargs) -> float:
         if len(y) == 0:
             return 0.0
 
         return np.mean((y - predictions) ** 2) + self._l2_leaf_reg * np.sum(predictions ** 2) + self._l1_leaf_reg * np.sum(np.abs(predictions)) 
     
-    def predict(self, y: np.ndarray) -> float:
+    def predict(self, y: np.ndarray, **kwargs) -> float:
         if len(y) == 0:
             return 0.0
 
         return y.mean(axis=0)
     
-    def grad_output(self, y: np.ndarray, predictions: np.ndarray) -> np.ndarray:
+    def grad_output(self, y: np.ndarray, predictions: np.ndarray, **kwargs) -> np.ndarray:
         return y - predictions

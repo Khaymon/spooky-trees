@@ -5,7 +5,7 @@ import typing as T
 import numpy as np
 import pandas as pd
 
-from spooky_trees.criterions import SpookyCriterion, SpookyEntropy
+from spooky_trees.criterions import SpookyCriterion
 from spooky_trees.predicates import (
     SpookyCategorialPredicate,
     SpookyCompareOperation,
@@ -36,7 +36,7 @@ class SpookyTree:
         min_samples_split: int = 2,
         min_information_gain: float = 0.0,
         rsm: float = 1.0,
-        cat_features: T.Set[int] | None = None,
+        cat_features: T.Optional[T.Set[int]] = None,
         **criterion_params,
     ):
         self.max_depth = max_depth
@@ -48,7 +48,13 @@ class SpookyTree:
 
         self._root = None
     
-    def _get_best_numerical_threshold(self, X: np.ndarray, y: np.ndarray, feature_idx: str) -> T.Tuple[int | float, float]:
+    def _get_best_numerical_threshold(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        weights: np.ndarray,
+        feature_idx: str
+    ) -> T.Tuple[T.Union[int, float], float]:
         assert len(y) > 1, "Number of samples must be greater than 1"
 
         argsorted_feature_values = X[:, feature_idx].argsort()
@@ -68,12 +74,15 @@ class SpookyTree:
                 idx += 1
             if idx >= len(X_feature_sorted):
                 break
+            
+            left_weights = weights[:idx]
+            right_weights = weights[idx:]
 
-            y_left_predictions = self.criterion.predict(y_sorted[:idx])
-            y_right_predictions = self.criterion.predict(y_sorted[idx:])
+            y_left_predictions = self.criterion.predict(y_sorted[:idx], weights=left_weights)
+            y_right_predictions = self.criterion.predict(y_sorted[idx:], weights=right_weights)
 
-            left_criterion = self.criterion(y_sorted[:idx], y_left_predictions)
-            right_criterion = self.criterion(y_sorted[idx:], y_right_predictions)
+            left_criterion = self.criterion(y_sorted[:idx], y_left_predictions, weights=left_weights)
+            right_criterion = self.criterion(y_sorted[idx:], y_right_predictions, weights=right_weights)
 
             criterion = left_criterion * idx + right_criterion * (len(X_feature_sorted) - idx)
             if criterion < best_criterion:
@@ -90,7 +99,8 @@ class SpookyTree:
     def _get_best_categorial_threshold(
         self,
         X: np.ndarray,
-        y: np.ndarray, 
+        y: np.ndarray,
+        weights: np.ndarray, 
         feature_idx: int
     ) -> T.Tuple[T.List[T.Set[float]], float]:
         unique_values = set(np.unique(X[:, feature_idx].astype(int)))
@@ -102,9 +112,10 @@ class SpookyTree:
         for feature_value in unique_values:
             feature_value_mask = X[:, feature_idx] == feature_value
             y_feature_value = y[feature_value_mask]
+            weights_feature_value = weights[feature_value_mask]
 
-            y_feature_value_predictions = self.criterion.predict(y_feature_value)
-            best_criterion += self.criterion(y_feature_value, y_feature_value_predictions) * len(y_feature_value)
+            y_feature_value_predictions = self.criterion.predict(y_feature_value, weights=weights_feature_value)
+            best_criterion += self.criterion(y_feature_value, y_feature_value_predictions, weights=weights_feature_value) * len(y_feature_value)
 
         # for feature_value in unique_values:
         #     feature_value_mask = X[:, feature_idx] == feature_value
@@ -143,7 +154,7 @@ class SpookyTree:
 
         return threshold, best_criterion
 
-    def _get_best_feature(self, X: np.ndarray, y: np.ndarray) -> T.Tuple[str, float | None]:
+    def _get_best_feature(self, X: np.ndarray, y: np.ndarray, weights: np.ndarray) -> T.Tuple[str, T.Optional[float]]:
         best_feature = None
         best_threshold = None
         best_criterion = None
@@ -154,9 +165,9 @@ class SpookyTree:
                 continue
 
             if idx in self.cat_features:
-                threshold, current_criterion = self._get_best_categorial_threshold(X, y, idx)
+                threshold, current_criterion = self._get_best_categorial_threshold(X, y, weights, idx)
             else:
-                threshold, current_criterion = self._get_best_numerical_threshold(X, y, idx)
+                threshold, current_criterion = self._get_best_numerical_threshold(X, y, weights, idx)
 
             if best_criterion is None or current_criterion < best_criterion:
                 best_feature = idx
@@ -169,7 +180,8 @@ class SpookyTree:
         self,
         X: np.ndarray,
         y: np.ndarray,
-        node: SpookyNode | None,
+        weights: np.ndarray,
+        node: T.Optional[SpookyNode],
         depth: int
     ):
         assert len(X) == len(y), "Lengths of samples and targets should be equal"
@@ -181,10 +193,10 @@ class SpookyTree:
         if len(X) < self.min_samples_split:
             return
 
-        feature_idx, threshold, criterion = self._get_best_feature(X, y)
+        feature_idx, threshold, criterion = self._get_best_feature(X, y, weights)
 
-        y_predictions = self.criterion.predict(y)
-        if len(y) * self.criterion(y, y_predictions) - criterion < self.min_information_gain:
+        y_predictions = self.criterion.predict(y, weights=weights)
+        if len(y) * self.criterion(y, y_predictions, weights=weights) - criterion < self.min_information_gain:
             return
 
         children = []
@@ -193,7 +205,7 @@ class SpookyTree:
                 feature_value_predicate = SpookyCategorialPredicate(feature_idx, features_set)
                 feature_value_mask = feature_value_predicate(X)
 
-                prediction = self.criterion.predict(y[feature_value_mask])
+                prediction = self.criterion.predict(y[feature_value_mask], weights=weights[feature_value_mask])
                 feature_value_node = SpookyNode(prediction=prediction)
 
                 children.append((feature_value_predicate, feature_value_node))
@@ -201,6 +213,7 @@ class SpookyTree:
                 self._spooky_branch(
                     X=X[feature_value_mask],
                     y=y[feature_value_mask],
+                    weights=weights[feature_value_mask],
                     node=feature_value_node,
                     depth=depth + 1,
                 )
@@ -212,8 +225,8 @@ class SpookyTree:
             left_elements_mask = left_predicate(X)
             right_elements_mask = right_predicate(X)
 
-            left_prediction = self.criterion.predict(y[left_elements_mask])
-            right_prediction = self.criterion.predict(y[right_elements_mask])
+            left_prediction = self.criterion.predict(y[left_elements_mask], weights=weights[left_elements_mask])
+            right_prediction = self.criterion.predict(y[right_elements_mask], weights=weights[right_elements_mask])
 
             left_node = SpookyNode(prediction=left_prediction)
             right_node = SpookyNode(prediction=right_prediction)
@@ -224,26 +237,31 @@ class SpookyTree:
             self._spooky_branch(
                 X=X[left_elements_mask],
                 y=y[left_elements_mask],
+                weights=weights[left_elements_mask],
                 node=left_node,
                 depth=depth + 1,
             )
             self._spooky_branch(
                 X=X[right_elements_mask],
                 y=y[right_elements_mask],
+                weights=weights[right_elements_mask],
                 node=right_node,
                 depth=depth + 1,
             )
 
         node.children = tuple(children)
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> "SpookyTree":
+    def fit(self, X: np.ndarray, y: np.ndarray, weights: T.Optional[np.ndarray] = None) -> "SpookyTree":
         assert len(X) == len(y), "Number of objects and targets should be equal"
+        
+        if weights is None:
+            weights = np.ones(len(y), dtype=np.float32)
 
         self.n_classes = len(np.unique(y))
 
-        prediction = self.criterion.predict(y)
+        prediction = self.criterion.predict(y, weights)
         self._root = SpookyNode(prediction=prediction)
-        self._spooky_branch(X=X, y=y, node=self._root, depth=1)
+        self._spooky_branch(X=X, y=y, weights=weights, node=self._root, depth=1)
 
         return self
     

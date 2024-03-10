@@ -12,7 +12,7 @@ class SpookyCategorialPredicate(SpookyPredicate):
 
         self.predicate_func = np.vectorize(lambda x: x in feature_values)
 
-    def __call__(self, X: np.ndarray) -> np.ndarray | bool:
+    def __call__(self, X: np.ndarray) -> T.Union[np.ndarray, bool]:
 
         if X.ndim == 2:
             return self.predicate_func(X[:, self.feature_idx].astype(int))

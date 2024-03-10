@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import typing as T
 
 import numpy as np
 
@@ -12,14 +13,14 @@ class SpookyCompareOperation:
 
 
 class SpookyNumericalPredicate(SpookyPredicate):
-    def __init__(self, feature_idx: str, value: float | int, operation: str):
+    def __init__(self, feature_idx: str, value: T.Union[float, int], operation: str):
         assert operation in (SpookyCompareOperation.LESS, SpookyCompareOperation.GREATER_OR_EQUAL)
         
         self._feature_idx = feature_idx
         self._value = value
         self._operation = operation
 
-    def __call__(self, X: np.ndarray) -> np.ndarray | bool:
+    def __call__(self, X: np.ndarray) -> T.Union[np.ndarray, bool]:
         if self._operation == SpookyCompareOperation.LESS:
             if X.ndim == 2:
                 return X[:, self._feature_idx] < self._value

@@ -7,7 +7,7 @@ import random
 def train_test_split(
     X: np.ndarray,
     y: np.ndarray,
-    test_size: int | float = 0.1,
+    test_size: T.Union[int, float] = 0.1,
 ) -> T.Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     assert len(X) == len(y)
     
