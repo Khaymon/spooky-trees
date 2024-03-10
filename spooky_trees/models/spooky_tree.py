@@ -35,7 +35,7 @@ class SpookyTree:
         max_depth: int = -1,
         min_samples_split: int = 2,
         min_information_gain: float = 0.0,
-        rsm: float | None = None,
+        rsm: float = 1.0,
         cat_features: T.Set[int] | None = None,
         **criterion_params,
     ):
